@@ -1,0 +1,63 @@
+
+name: OpenJarvis Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build OpenJarvis APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '15859902'
+          accept-android-sdk-licenses: true
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager "ndk;27.2.12479018"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Initialize Android project
+        working-directory: frontend
+        run: npx tauri android init --ci
+
+      - name: Build APK
+        working-directory: frontend
+        run: npx tauri android build --apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenJarvis-APK
+          path: frontend/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          
